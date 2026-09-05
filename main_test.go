@@ -1,11 +1,14 @@
 package main
 
 import (
+	"context"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestHealthz(t *testing.T) {
@@ -49,5 +52,48 @@ func TestStatic(t *testing.T) {
 	}
 	if len(body) == 0 {
 		t.Fatal("empty static file")
+	}
+}
+
+func TestServeStopsOnCancel(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() {
+		done <- serve(ctx, &http.Server{Handler: newMux()}, ln)
+	}()
+
+	url := "http://" + ln.Addr().String() + "/healthz"
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		resp, getErr := http.Get(url)
+		if getErr == nil {
+			_ = resp.Body.Close()
+			if resp.StatusCode == http.StatusOK {
+				break
+			}
+		}
+		if time.Now().After(deadline) {
+			cancel()
+			t.Fatal("server did not start")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	cancel()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("server did not shut down")
+	}
+
+	if _, err := http.Get(url); err == nil {
+		t.Fatal("server still accepting connections")
 	}
 }
