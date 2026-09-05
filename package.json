@@ -5,10 +5,12 @@
   "scripts": {
     "lint": "eslint .",
     "format": "prettier --write .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --test"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@types/node": "^26.4.1",
     "eslint": "^10.10.0",
     "prettier": "^3.9.6",
     "typescript": "^6.0.3",
